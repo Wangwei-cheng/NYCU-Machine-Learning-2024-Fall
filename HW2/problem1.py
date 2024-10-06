@@ -47,25 +47,25 @@ def Discrete(x_train, y_train, x_test, y_test):
     n_bin = 32
     peudocount = 0.00000001
     
-    prior = np.zeros(n_class) # compute prior prob for each label(theda)
-    likelihood = np.zeros((10, n_row*n_col, n_bin)) # likelihood[label][pixels][bin]
+    label_count = np.zeros(n_class)
+    likelihood = np.zeros((n_class, n_row*n_col, n_bin)) # likelihood[label][pixels][bin]
 
     for i in trange(n_train):
-        prior[y_train[i]] += 1
+        label_count[y_train[i]] += 1
         for row in range(n_row):
             for col in range(n_col):
                 bin = x_train[i][row][col] // 8
                 likelihood[y_train[i]][row*n_col + col][bin] += 1
 
+    prior = label_count / n_train # compute prior prob for each label(theda)
+
     for label in range(n_class):
         for pixel in range(n_row*n_col):
             for bin in range(n_bin):
                 if likelihood[label][pixel][bin] == 0:
-                    likelihood[label][pixel][bin] = peudocount # let the peudocount to be the minimum of possible number of bin
+                    likelihood[label][pixel][bin] = peudocount
                 else:
-                    likelihood[label][pixel][bin] /= prior[label] # number of each bin need to be divided to number of data of its label
-
-    prior /= n_train
+                    likelihood[label][pixel][bin] /= label_count[label] # number of each bin need to be divided to number of data of its label
     
     error = 0
     for i in range(n_test):
@@ -96,8 +96,10 @@ def Discrete(x_train, y_train, x_test, y_test):
         for row in range(n_row):
             for col in range(n_col):
                 # max of bins of likelihood[label][pixel] happens in 0 ~ 15 -> 0, 16 ~ 31 -> 1
-                if np.argmax(likelihood[label][row*n_col + col]) <= 15: print("0 ", end="")
-                else:                                                   print("1 ", end="")
+                if np.argmax(likelihood[label][row*n_col + col]) <= 15:
+                    print("0 ", end="")
+                else:
+                    print("1 ", end="")
             
             print()
 
@@ -106,12 +108,86 @@ def Discrete(x_train, y_train, x_test, y_test):
     return
 
 def Continuous(x_train, y_train, x_test, y_test):
+    n_train, n_test = len(x_train), len(x_test)
+    n_row, n_col = x_train[0].shape
+    classes = sorted(np.unique(y_test))
+    n_class = len(classes)
+    peudocount = 0.5 * math.pi
+    
+    label_count = np.zeros(n_class)
+    mean = np.zeros((n_class, n_row, n_col))
+    varience = np.zeros((n_class, n_row, n_col))
+
+    for i in trange(n_train):
+        label = y_train[i]
+        label_count[label] += 1
+        for row in range(n_row):
+            for col in range(n_col):
+                mean[label][row][col] += x_train[i][row][col]
+
+    prior = label_count / n_train # compute prior prob for each label(theda)
+
+    for label in range(n_class):
+        mean[label] /= label_count[label]
+    
+    for i in trange(n_train):
+        label = y_train[i]
+        for row in range(n_row):
+            for col in range(n_col):
+                varience[label][row][col] += (x_train[i][row][col] - mean[label][row][col])**2
+
+    for label in range(n_class):
+        varience[label] /= label_count[label]
+    
+    for label in range(n_class):
+        for row in range(n_row):
+            for col in range(n_col):
+                if varience[label][row][col] == 0:
+                    varience[label][row][col] = peudocount
+
+    error = 0
+    for i in range(n_test):
+        posterior = np.zeros(n_class)
+        for label in range(n_class):
+            posterior[label] += math.log(prior[label])
+            for row in range(n_row):
+                for col in range(n_col):
+                    posterior[label] += -0.5*(math.log(2) + math.log(math.pi) + math.log(varience[label][row][col]) + (x_test[i][row][col] - mean[label][row][col])**2 / varience[label][row][col])
+        
+        posterior /= sum(posterior)
+        prediction = OutputPosterior(posterior)
+        print("Prediction: ", prediction, ", Ans: ", y_test[i])
+        print()
+
+        if prediction != y_test[i]:
+            error += 1
+
+    error /= n_test
+
+    # Print out the imagination of numbers in your Bayes classifier
+    print("Imagination of numbers in Bayesian classifier:")
+
+    for label in range(n_class):
+        print()
+        print(label, ":")
+        for row in range(n_row):
+            for col in range(n_col):
+                # mean[label][row][col] in 0~127 -> 0, 128 ~ 255 -> 1
+                if mean[label][row][col] <= 127:
+                    print("0 ", end="")
+                else:
+                    print("1 ", end="")
+            
+            print()
+
+    print("Error rate: ", error)
+
     return
 
 if __name__ == "__main__":
     if len(sys.argv) < 2:
-            print('no argument')
-            sys.exit()
+        print('no argument')
+        sys.exit()
 
     train_images_filepath = sys.argv[1]
     train_labels_filepath = sys.argv[2]
@@ -128,8 +204,10 @@ if __name__ == "__main__":
     # plt.show()
     # print(y_test[0])
 
-    if toggle == 0: Discrete(x_train, y_train, x_test, y_test)
-    else:           Continuous(x_train, y_train, x_test, y_test)
+    if toggle == 0:
+        Discrete(x_train, y_train, x_test, y_test)
+    else:
+        Continuous(x_train, y_train, x_test, y_test)
 
     
     
