@@ -1,5 +1,9 @@
 for problem1.py:
-    python problem1.py train-images.idx3-ubyte_ train-labels.idx1-ubyte_ t10k-images.idx3-ubyte_ t10k-labels.idx1-ubyte_ 1
+
+python problem1.py train-images.idx3-ubyte_ train-labels.idx1-ubyte_ t10k-images.idx3-ubyte_ t10k-labels.idx1-ubyte_ 1
 
 for problem2.py:
-    python testfile.txt 0 0
+
+python problem2.py testfile.txt 0 0
+
+python problem2.py testfile.txt 10 1
